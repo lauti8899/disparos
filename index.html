@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Duelos de Arena - 2 Jugadores</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; background: #1a1a1a; font-family: 'Arial', sans-serif; overflow: hidden; }
+    canvas { display: block; margin: auto; background: radial-gradient(#333, #111); border: 4px solid #555; border-radius: 10px; }
+    #info {
+      position: absolute;
+      top: 10px;
+      width: 100%;
+      text-align: center;
+      color: white;
+      font-size: 1.2rem;
+    }
+    #scoreboard {
+      position: absolute;
+      bottom: 10px;
+      width: 100%;
+      text-align: center;
+      color: white;
+      font-size: 1.2rem;
+    }
+  </style>
+</head>
+<body>
+  <div id="info">Jugador 1: WASD para moverse, F para disparar | Jugador 2: Flechas para moverse, M para disparar</div>
+  <canvas id="game"></canvas>
+  <div id="scoreboard">Jugador 1: 0 | Jugador 2: 0</div>
+
+  <script>
+    const canvas = document.getElementById("game");
+    const ctx = canvas.getContext("2d");
+    canvas.width = 800;
+    canvas.height = 600;
+
+    const scoreboard = document.getElementById("scoreboard");
+    let score1 = 0;
+    let score2 = 0;
+
+    class Player {
+      constructor(x, y, color, keys) {
+        this.x = x;
+        this.y = y;
+        this.w = 40;
+        this.h = 40;
+        this.color = color;
+        this.keys = keys;
+        this.speed = 5;
+        this.bullets = [];
+        this.cooldown = 0;
+        this.health = 100;
+      }
+
+      draw() {
+        ctx.fillStyle = this.color;
+        ctx.fillRect(this.x, this.y, this.w, this.h);
+        // Health bar
+        ctx.fillStyle = "#0f0";
+        ctx.fillRect(this.x, this.y - 10, this.w * (this.health / 100), 5);
+        ctx.strokeStyle = "#fff";
+        ctx.strokeRect(this.x, this.y - 10, this.w, 5);
+      }
+
+      move() {
+        if (keysPressed[this.keys.left]) this.x -= this.speed;
+        if (keysPressed[this.keys.right]) this.x += this.speed;
+        if (keysPressed[this.keys.up]) this.y -= this.speed;
+        if (keysPressed[this.keys.down]) this.y += this.speed;
+        this.x = Math.max(0, Math.min(canvas.width - this.w, this.x));
+        this.y = Math.max(0, Math.min(canvas.height - this.h, this.y));
+      }
+
+      shoot() {
+        if (this.cooldown === 0) {
+          this.bullets.push({ x: this.x + this.w/2 - 5, y: this.y + this.h/2 - 5, dx: this.keys.bulletDx, dy: this.keys.bulletDy });
+          this.cooldown = 15;
+        }
+      }
+
+      updateBullets() {
+        this.bullets.forEach(b => {
+          b.x += b.dx;
+          b.y += b.dy;
+        });
+        this.bullets = this.bullets.filter(b => b.x >= 0 && b.x <= canvas.width && b.y >= 0 && b.y <= canvas.height);
+        this.bullets.forEach(b => {
+          ctx.fillStyle = "white";
+          ctx.fillRect(b.x, b.y, 10, 10);
+        });
+        if (this.cooldown > 0) this.cooldown--;
+      }
+
+      reset(x, y) {
+        this.x = x;
+        this.y = y;
+        this.health = 100;
+        this.bullets = [];
+      }
+    }
+
+    const player1 = new Player(100, 100, "#00f", {
+      left: "a", right: "d", up: "w", down: "s", shoot: "f", bulletDx: 7, bulletDy: 0
+    });
+
+    const player2 = new Player(600, 400, "#f00", {
+      left: "ArrowLeft", right: "ArrowRight", up: "ArrowUp", down: "ArrowDown", shoot: "m", bulletDx: -7, bulletDy: 0
+    });
+
+    let keysPressed = {};
+    window.addEventListener("keydown", e => {
+      keysPressed[e.key] = true;
+      if (e.key === player1.keys.shoot) player1.shoot();
+      if (e.key === player2.keys.shoot) player2.shoot();
+    });
+    window.addEventListener("keyup", e => delete keysPressed[e.key]);
+
+    function checkBulletHits(bullets, target) {
+      bullets.forEach(b => {
+        if (b.x < target.x + target.w && b.x + 10 > target.x && b.y < target.y + target.h && b.y + 10 > target.y) {
+          target.health -= 20;
+          b.hit = true;
+        }
+      });
+      bullets = bullets.filter(b => !b.hit);
+      return bullets;
+    }
+
+    function updateScoreboard() {
+      scoreboard.innerText = `Jugador 1: ${score1} | Jugador 2: ${score2}`;
+    }
+
+    function gameLoop() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      player1.move();
+      player2.move();
+      player1.draw();
+      player2.draw();
+      player1.updateBullets();
+      player2.updateBullets();
+
+      player1.bullets = checkBulletHits(player1.bullets, player2);
+      player2.bullets = checkBulletHits(player2.bullets, player1);
+
+      if (player1.health <= 0) {
+        score2++;
+        updateScoreboard();
+        player1.reset(100, 100);
+        player2.reset(600, 400);
+      }
+
+      if (player2.health <= 0) {
+        score1++;
+        updateScoreboard();
+        player1.reset(100, 100);
+        player2.reset(600, 400);
+      }
+
+      requestAnimationFrame(gameLoop);
+    }
+
+    updateScoreboard();
+    gameLoop();
+  </script>
+</body>
+</html>
